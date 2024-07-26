@@ -8,7 +8,7 @@ open_ai_key = os.getenv("OPENAI_API_KEY")
 # Define Functions
 assistant = client.beta.assistants.create(
   instructions="You are a weather bot. Use the provided functions to answer questions.",
-  model="gpt-4o",
+  model="gpt-4o-mini-2024-07-18",
   tools=[
     {
       "type": "function",
