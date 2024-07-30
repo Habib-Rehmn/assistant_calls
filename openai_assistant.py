@@ -1,138 +1,279 @@
+# from openai import OpenAI
+# import requests
+# import os
+# import json
+
+
+# openai_api_key = os.getenv("OPENAI_API_KEY")
+# client = OpenAI()
+
+
+# # Function to get all user competitions
+# def get_all_user_competitions():
+#     url = "http://74.208.220.213:8001/api/v1/all_users_competition/?page=1&status=0"
+#     response = requests.get(url)
+#     if response.status_code == 200:
+#         #print(response.json())
+#         return response.json()
+#     else:
+#         return {"error": "Failed to retrieve competitions"}
+
+# # Initialize OpenAI client
+# client = OpenAI()
+
+# # Create the assistant with the defined function
+# assistant = client.beta.assistants.create(
+#     name = "Coach V Assistant",
+#     instructions="You are a competition assistant. Use the provided function to answer questions about user competitions.",
+#     model="gpt-4o-mini-2024-07-18",
+#     tools=[
+#         {"type": "file_search"},
+#         {
+#             "type": "function",
+#             "function": {
+#                 "name": "get_all_user_competitions",
+#                 "description": "Get all competitions for all users",
+#                 "parameters": {
+#                     "type": "object",
+#                     "properties": {}
+#                 },
+                
+#             }
+#         }
+#     ]
+# )
+
+
+# # Retreive the Vector Store
+# vector_store = client.beta.vector_stores.retrieve("vs_8HoAoxEzhK6EOVvXYCM7Fv5s")
+
+
+# # Update the Assistant to use the vector store
+# assistant = client.beta.assistants.update(
+#   assistant_id=assistant.id,
+#   tool_resources={"file_search": {"vector_store_ids": [vector_store.id]}},
+# )
+
+
+# # Create a thread and add a user message
+# thread = client.beta.threads.create()
+# message = client.beta.threads.messages.create(
+#     thread_id=thread.id,
+#     role="user",
+#     content="I want to get competitions for all users."
+# )
+
+# # Initiate a run and handle function calling
+# run = client.beta.threads.runs.create_and_poll(
+#     thread_id=thread.id,
+#     assistant_id=assistant.id,
+# )
+
+# # Check if the run requires action
+# if run.status == 'requires_action':
+#     tool_outputs = []
+    
+#     for tool in run.required_action.submit_tool_outputs.tool_calls:
+#         if tool.function.name == "get_all_user_competitions":
+#             competitions = get_all_user_competitions()
+#             tool_outputs.append({
+#                 "tool_call_id": tool.id,
+#                 "output": json.dumps(competitions)
+#             })
+
+#     # Submit all tool outputs
+#     if tool_outputs:
+#         try:
+#             run = client.beta.threads.runs.submit_tool_outputs_and_poll(
+#                 thread_id=thread.id,
+#                 run_id=run.id,
+#                 tool_outputs=tool_outputs
+#             )
+#             print("Tool outputs submitted successfully.")
+#         except Exception as e:
+#             print("Failed to submit tool outputs:", e)
+#     else:
+#         print("No tool outputs to submit.")
+# else:
+#     print(run.status)
+
+# # Print the final messages
+# if run.status == 'completed':
+#     messages = client.beta.threads.messages.list(
+#         thread_id=thread.id
+#     )
+#     print(messages)
+# else:
+#     print(run.status)
+
+
+
+
+
+
+import requests
 from openai import OpenAI
 import os
+import json
+
+
+openai_api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI()
 
-open_ai_key = os.getenv("OPENAI_API_KEY")
- 
- 
-# Define Functions
-assistant = client.beta.assistants.create(
-  name="Coach V",
-  instructions="You are a weather bot. Use the provided functions to answer questions. and you will also give answer to the user questoin based on the retrieved context about shot pulse sp and the setup instructions for shot pulse sp",
-  model="gpt-4o-mini-2024-07-18",
-  tools=[
-    {"type": "file_search"},
-    {
-      "type": "function",
-      "function": {
-        "name": "get_current_temperature",
-        "description": "Get the current temperature for a specific location",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "location": {
-              "type": "string",
-              "description": "The city and state, e.g., San Francisco, CA"
-            },
-            "unit": {
-              "type": "string",
-              "enum": ["Celsius", "Fahrenheit"],
-              "description": "The temperature unit to use. Infer this from the user's location."
-            }
-          },
-          "required": ["location", "unit"]
-        }
-      }
-    },
-    {
-      "type": "function",
-      "function": {
-        "name": "get_rain_probability",
-        "description": "Get the probability of rain for a specific location",
-        "parameters": {
-          "type": "object",
-          "properties": {
-            "location": {
-              "type": "string",
-              "description": "The city and state, e.g., San Francisco, CA"
-            }
-          },
-          "required": ["location"]
-        }
-      }
+
+# Function to get all user competitions
+def get_all_user_competitions():
+    url = "http://74.208.220.213:8001/api/v1/all_users_competition/?page=1&status=0"
+    response = requests.get(url)
+    if response.status_code == 200:
+        return response.json()
+    else:
+        return {"error": "Failed to retrieve competitions"}
+
+# Function to sign up a user with all fields as form data
+def signup_user(first_name, last_name, email, password, file_path):
+    url = "http://74.208.220.213:8001/api/v1/signup/"
+    files = {
+        'upload_credentials': open(file_path, 'rb'),
+        'first_name': (None, first_name),
+        'last_name': (None, last_name),
+        'email': (None, email),
+        'password': (None, password)
     }
-  ]
+    response = requests.post(url, files=files)
+    if response.status_code == 201:
+        return response.json()
+    else:
+        print(response.text, 'thisssssssssssssssssssssss')
+        return {"error": "Failed to sign up user"}
+
+# Initialize OpenAI client
+client = OpenAI()
+
+# Create the assistant with the defined functions
+assistant = client.beta.assistants.create(
+    instructions="You are a competition and signup assistant. Use the provided functions to answer questions about user competitions and to sign up users.",
+    model="gpt-4o",
+    tools=[
+        {
+            "type": "function",
+            "function": {
+                "name": "get_all_user_competitions",
+                "description": "Get all competitions for all users",
+                "parameters": {
+                    "type": "object",
+                    "properties": {}
+                }
+            }
+        },
+        {
+            "type": "function",
+            "function": {
+                "name": "signup_user",
+                "description": "Sign up a new user",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "first_name": {
+                            "type": "string",
+                            "description": "First name of the user"
+                        },
+                        "last_name": {
+                            "type": "string",
+                            "description": "Last name of the user"
+                        },
+                        "email": {
+                            "type": "string",
+                            "description": "Email of the user"
+                        },
+                        "password": {
+                            "type": "string",
+                            "description": "Password for the account"
+                        },
+                        "file_path": {
+                            "type": "string",
+                            "description": "Path to the file to be uploaded"
+                        }
+                    },
+                    "required": ["first_name", "last_name", "email", "password", "file_path"]
+                }
+            }
+        }
+    ]
 )
 
-
-# Create a vector store caled "SP"
-vector_store = client.beta.vector_stores.create(name="tool_test")
-
-# Ready the files for upload to OpenAI
-file_path = 'sp_data.txt'
-file_streams = [open(file_path, "rb")]
-
-
-# Use the upload and poll SDK helper to upload the files, add them to the vector store,
-# and poll the status of the file batch for completion.
-file_batch = client.beta.vector_stores.file_batches.upload_and_poll(
-  vector_store_id=vector_store.id, files=file_streams
-)
-
-# You can print the status and the file counts of the batch to see the result of this operation.
-print(file_batch.status)
-print(file_batch.file_counts)
-print(vector_store.id)
-
-
-#Update the assistant to to use the new Vector Store
-assistant = client.beta.assistants.update(
-  assistant_id=assistant.id,
-  tool_resources={"file_search": {"vector_store_ids": [vector_store.id]}},
-)
-
-
-
-#Create a Thread and Add a message
+# Create a thread and add a user message
 thread = client.beta.threads.create()
 message = client.beta.threads.messages.create(
-  thread_id=thread.id,
-  role="user",
-  content="What is sp",
+    thread_id=thread.id,
+    role="user",
+    content="I want to signup here are my details first name john last name harry email johnhlack@gmail.com password 1234h$h1234 and here is my filepah './sp_data.txt'."
 )
 
+# Initiate a run and handle function calling
+run = client.beta.threads.runs.create_and_poll(
+    thread_id=thread.id,
+    assistant_id=assistant.id,
+)
 
-#Initiate a Run
-from typing_extensions import override
-from openai import AssistantEventHandler
- 
-class EventHandler(AssistantEventHandler):
-    @override
-    def on_event(self, event):
-      # Retrieve events that are denoted with 'requires_action'
-      # since these will have our tool_calls
-      if event.event == 'thread.run.requires_action':
-        run_id = event.data.id  # Retrieve the run ID from the event data
-        self.handle_requires_action(event.data, run_id)
- 
-    def handle_requires_action(self, data, run_id):
-      tool_outputs = []
-        
-      for tool in data.required_action.submit_tool_outputs.tool_calls:
-        if tool.function.name == "get_current_temperature":
-          tool_outputs.append({"tool_call_id": tool.id, "output": "57"})
-        elif tool.function.name == "get_rain_probability":
-          tool_outputs.append({"tool_call_id": tool.id, "output": "0.06"})
-        
-      # Submit all tool_outputs at the same time
-      self.submit_tool_outputs(tool_outputs, run_id)
- 
-    def submit_tool_outputs(self, tool_outputs, run_id):
-      # Use the submit_tool_outputs_stream helper
-      with client.beta.threads.runs.submit_tool_outputs_stream(
-        thread_id=self.current_run.thread_id,
-        run_id=self.current_run.id,
-        tool_outputs=tool_outputs,
-        event_handler=EventHandler(),
-      ) as stream:
-        for text in stream.text_deltas:
-          print(text, end="", flush=True)
-        print()
- 
- 
-with client.beta.threads.runs.stream(
-  thread_id=thread.id,
-  assistant_id=assistant.id,
-  event_handler=EventHandler()
-) as stream:
-  stream.until_done()
+# Check if the run requires action
+if run.status == 'requires_action':
+    tool_outputs = []
+    
+    for tool in run.required_action.submit_tool_outputs.tool_calls:
+        if tool.function.name == "get_all_user_competitions":
+            competitions = get_all_user_competitions()
+            tool_outputs.append({
+                "tool_call_id": tool.id,
+                "output": json.dumps(competitions)
+            })
+        elif tool.function.name == "signup_user":
+            print(tool,"tolllllllllllllllllllllllllllllll")
+            # Assume we have the required parameters, for example:
+            str = tool.function.arguments
+            # Parse JSON string into a dictionary
+            data = json.loads(str)
+
+            # Extract values
+            first_name = data["first_name"]
+            last_name = data["last_name"]
+            email = data["email"]
+            password = data["password"]
+            file_path = data["file_path"]
+            # first_name = "John"
+            # last_name = "Doe"
+            # email = "john.doe@example.com"
+            # password = "securepa$ssword123"
+            # file_path = "./sp_data.txt"  # Make sure this file exists
+            
+            signup_response = signup_user(first_name, last_name, email, password, file_path)
+            print(signup_response, "got ittttttttttttttttttttttttttttttttttttttttt")
+            tool_outputs.append({
+                "tool_call_id": tool.id,
+                "output": json.dumps(signup_response)
+            })
+
+    # Submit all tool outputs
+    if tool_outputs:
+        try:
+            run = client.beta.threads.runs.submit_tool_outputs_and_poll(
+                thread_id=thread.id,
+                run_id=run.id,
+                tool_outputs=tool_outputs
+            )
+            print("Tool outputs submitted successfully.")
+        except Exception as e:
+            print("Failed to submit tool outputs:", e)
+    else:
+        print("No tool outputs to submit.")
+else:
+    print(run.status)
+
+# Print the final messages
+if run.status == 'completed':
+    messages = client.beta.threads.messages.list(
+        thread_id=thread.id
+    )
+    print(messages)
+else:
+    print(run.status)
