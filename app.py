@@ -1,10 +1,11 @@
 import requests
-from flask import Flask, render_template, request, redirect, url_for
+from flask import Flask, render_template, request, redirect, url_for, session
 from openai import OpenAI
 import os
 import json
 
 app = Flask(__name__)
+app.secret_key = 'your_secret_key'  # Required for session management
 
 openai_api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI()
@@ -42,9 +43,9 @@ def index():
         
         # Create the assistant with the defined functions
         assistant = client.beta.assistants.create(
-            instructions="You are a competition and signup assistant. Use the provided functions to answer questions about user competitions and to sign up users.",
+            instructions="You are a competition and signup assistant. Use the provided functions to answer questions about user competitions and to sign up users. and you will also give answer to the user question about shot pulse sp, using the file provided",
             model="gpt-4o",
-            tools=[
+            tools=[{"type": "file_search"},
                 {
                     "type": "function",
                     "function": {
@@ -91,6 +92,16 @@ def index():
                 }
             ]
         )
+        
+        # Reteive the Vector Store
+        vector_store = client.beta.vector_stores.retrieve("vs_9uYldVoicTMRvBvma5vw8Lch")
+        
+
+        # Update the knowledge base of the assistant 
+        assistant = client.beta.assistants.update(
+        assistant_id=assistant.id,
+        tool_resources={"file_search": {"vector_store_ids": [vector_store.id]}},
+        )
 
         # Create a thread and add a user message
         thread = client.beta.threads.create()
@@ -105,6 +116,8 @@ def index():
             thread_id=thread.id,
             assistant_id=assistant.id,
         )
+        
+        
 
         # Check if the run requires action
         if run.status == 'requires_action':
@@ -115,8 +128,30 @@ def index():
                     data = json.loads(tool.function.arguments)
                     
                     # Store data in session and redirect to verification form
-                    request.form['signup_data'] = data
-                    return redirect(url_for('verify_signup', data=data))
+                    session['signup_data'] = data
+
+                    # Show the extracted parameters to the use and
+                    # Get the updated or verified parameters from the user
+                    
+                    data = session.get('signup_data', {})
+                    
+                    # Call the API with verified parameters
+                    if request.method == 'POST':
+                        first_name = request.form['first_name']
+                        last_name = request.form['last_name']
+                        email = request.form['email']
+                        password = request.form['password']
+                        file_path = request.form['file_path']
+
+                        signup_response = signup_user(first_name, last_name, email, password, file_path)
+        
+                    # Append the data to the tool_outputs
+                    tool_outputs.append({
+                        "tool_call_id": tool.id,
+                        "output": json.dumps(competitions)
+                    })
+                    
+                    #return redirect(url_for('verify_signup'))
                 
                 elif tool.function.name == "get_all_user_competitions":
                     competitions = get_all_user_competitions()
@@ -139,25 +174,48 @@ def index():
             else:
                 print("No tool outputs to submit.")
         else:
-            print(run.status)
+            # Print the final messages
+            if run.status == 'completed':
+                messages = client.beta.threads.messages.list(
+                    thread_id=thread.id
+                )
+                print(messages)
+            else:
+                print(run.status)
+        
+    return render_template('index.html', response=signup_response)
 
-    return render_template('index.html')
+# @app.route('/verify_signup', methods=['GET', 'POST'])
+# def verify_signup():
+#     print("we got till hereeeeeeeeeeeeeeeeeeeeeeee")
+#     if request.method == 'POST':
+#         first_name = request.form['first_name']
+#         last_name = request.form['last_name']
+#         email = request.form['email']
+#         password = request.form['password']
+#         file_path = request.form['file_path']
 
-@app.route('/verify_signup', methods=['GET', 'POST'])
-def verify_signup():
-    if request.method == 'POST':
-        first_name = request.form['first_name']
-        last_name = request.form['last_name']
-        email = request.form['email']
-        password = request.form['password']
-        file_path = request.form['file_path']
+#         signup_response = signup_user(first_name, last_name, email, password, file_path)
+        
+#         ##Convert the signup response back to json string
+        
+        
+#         run = client.beta.threads.runs.retrieve(
+#         thread_id="thread_abc123",
+#         run_id="run_abc123"
+#         )
+#         #Append the signup response to tool output
+#         tool_outputs.append({
+#             "tool_call_id": tool.id,
+#             "output": json.dumps(signup_response)
+#         })
+        
+#         #Submitt the final tool output
 
-        signup_response = signup_user(first_name, last_name, email, password, file_path)
+#         return render_template('result.html', response=signup_response)
 
-        return render_template('result.html', response=signup_response)
-
-    data = request.args.get('data', {})
-    return render_template('verify_signup.html', data=data)
+#     data = session.get('signup_data', {})
+#     return render_template('verify_signup.html', data=data)
 
 if __name__ == '__main__':
     app.run(debug=True)

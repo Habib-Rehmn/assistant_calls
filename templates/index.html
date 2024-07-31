@@ -7,10 +7,38 @@
 </head>
 <body>
     <h1>Chat with the Assistant</h1>
+    {% if not data %}
+    <!-- Initial user input form -->
     <form action="/" method="POST">
         <textarea name="user_input" rows="4" cols="50"></textarea>
         <br>
         <input type="submit" value="Send">
     </form>
+    {% else %}
+    <!-- Verification form -->
+    <form action="/" method="POST">
+        <input type="hidden" name="verify" value="1">
+        <label for="first_name">First Name:</label>
+        <input type="text" id="first_name" name="first_name" value="{{ data['first_name'] }}">
+        <br>
+        <label for="last_name">Last Name:</label>
+        <input type="text" id="last_name" name="last_name" value="{{ data['last_name'] }}">
+        <br>
+        <label for="email">Email:</label>
+        <input type="email" id="email" name="email" value="{{ data['email'] }}">
+        <br>
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" value="{{ data['password'] }}">
+        <br>
+        <label for="file_path">File Path:</label>
+        <input type="text" id="file_path" name="file_path" value="{{ data['file_path'] }}">
+        <br>
+        <input type="submit" value="Submit">
+    </form>
+    {% endif %}
+    {% if response %}
+    <h2>Signup Result</h2>
+    <p>{{ response }}</p>
+    {% endif %}
 </body>
 </html>
